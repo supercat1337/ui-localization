@@ -1,13 +1,13 @@
-# `@supercat1337/ui-localization` – Technical Documentation for LLMs
+# `@supercat1337/localization` – Technical Documentation for LLMs
 
-This document provides a complete technical reference for the `@supercat1337/ui-localization` package. Use it to understand the internal API, dictionary format, and integration patterns when generating code for this library.
+This document provides a complete technical reference for the `@supercat1337/localization` package. Use it to understand the internal API, dictionary format, and integration patterns when generating code for this library.
 
 ## Overview
 
 The package exports two classes:
 
 - **`Localization`** – framework‑agnostic, pure JS. Does not assume any DOM or component model.
-- **`ComponentLocalization`** – extends `Localization` and adds convenience methods for BareDOM components (automatic lifecycle binding, UI refresh on language change).
+- **`ComponentLocalization`** – extends `Localization` and adds convenience methods for BareDOM components (automatic lifecycle binding, UI refresh on language change and component mount).
 
 Both classes use **private fields** (`#`) – no internal properties are exposed. Only the documented public API is accessible.
 
@@ -26,7 +26,7 @@ Simple translation with optional named placeholders:
 }
 ```
 
-Placeholders are replaced using `{key}`. The replacement values are passed as an object to `plural()` or internally when using `t()` directly (no replacement in `t()` – use `plural()` or manual formatting).
+Placeholders are replaced using `{key}`. The replacement values are passed as an object to `plural()` or when using `t()` directly (no replacement in `t()` – use `plural()` or manual formatting).
 
 ### Array values (pluralization)
 
@@ -79,7 +79,7 @@ interface LanguageProvider {
 
 #### `t(key: string): string`
 
-Returns the raw translation string for the current language. Does **not** perform placeholder replacement. To replace placeholders, use `plural()` or the protected `_format()` (not exposed; implement custom formatting manually if needed).
+Returns the raw translation string for the current language. Does **not** perform placeholder replacement.
 
 #### `plural(count: number, forms: string[], params?: Record<string, any>): string`
 
@@ -104,11 +104,11 @@ Formats a date using `Intl.DateTimeFormat`.
 
 Subscribes to language changes. The callback receives the `Localization` instance. Returns an unsubscribe function.
 
-#### `start(): () => void`
+#### `startListening(): () => void`
 
-Starts listening to language changes (idempotent). Returns unsubscribe. The library does **not** auto‑start; you must call `start()` or rely on `ComponentLocalization` which starts automatically when attached.
+Starts listening to language changes (idempotent). Returns unsubscribe. The library does **not** auto‑start; you must call `startListening()` or rely on `ComponentLocalization` which starts automatically when attached.
 
-#### `stop(): void`
+#### `stopListening(): void`
 
 Stops listening.
 
@@ -130,9 +130,9 @@ These act as the global language provider for all `ComponentLocalization` instan
 ```typescript
 new ComponentLocalization(
   dictionary: Dictionary,
-  options?: {
-    component?: BareComponent;      // BareDOM component instance
-    update?: (l10n: ComponentLocalization, component: BareComponent) => void;
+  options: {
+    component: BareComponent;      // BareDOM component instance
+    update: (l10n: ComponentLocalization, component: BareComponent) => void;
     languageProvider?: LanguageProvider;
   }
 )
@@ -147,6 +147,7 @@ interface BareComponent {
     addDisposer(fn: () => void): void;
     isConnected: boolean;
     getRefs(): Record<string, HTMLElement>;
+    on(event: string, callback: () => void): () => void; // used for 'connect' event
 }
 ```
 
@@ -154,11 +155,13 @@ interface BareComponent {
 
 #### `attach(component: BareComponent, updateFn: (l10n: ComponentLocalization, component: BareComponent) => void): void`
 
-Binds the localization instance to a component. Subscribes to language changes and calls `updateFn` whenever language changes. Also registers a disposer via `component.addDisposer` to auto‑detach on unmount. If `component.isConnected` is `true`, calls `updateFn` immediately.
+Binds the localization instance to a component. Subscribes to language changes and calls `updateFn` whenever language changes. Also registers a disposer via `component.addDisposer` to auto‑detach on unmount.  
+If the component is already connected, `updateFn` is called immediately. Otherwise, the library subscribes to the `'connect'` event and calls `updateFn` once when the component becomes connected.  
+You do **not** need to call `refresh()` in `connectedCallback`.
 
 #### `refresh(): void`
 
-Manually triggers `updateFn` (if attached). Useful when component state changes (e.g., `fileCount` updates) and you need to re‑evaluate dynamic texts.
+Manually triggers `updateFn` (if attached). Use this when **many** UI elements depend on component state and you prefer a single call over updating each element individually. However, **prefer direct updates** for performance (see guidelines below). Language changes already trigger `refresh()` automatically.
 
 #### `detach(): void`
 
@@ -168,17 +171,50 @@ Unsubscribes from language changes and removes the reference to the component. C
 
 When you attach `ComponentLocalization` to a component:
 
-1. The localization instance subscribes to language changes.
-2. It calls `component.addDisposer()` to schedule `detach()` when the component unmounts.
-3. On every language change, the provided `update` function runs, allowing you to update DOM refs.
-4. You must call `refresh()` manually whenever component state affecting displayed texts changes (e.g., new file count, upload progress). There is **no automatic reactivity** – this is by design to keep the library minimal and predictable.
+1. The localization instance subscribes to language changes via `onLanguageChange()`.
+2. If the component is already connected (`component.isConnected === true`), `updateFn` runs immediately.
+3. If the component is not yet connected, the library subscribes to the `'connect'` event (emitted by the component after `connectedCallback`).
+4. **The `'connect'` subscription remains active for the entire lifetime of the component** – it does **not** auto‑unsubscribe after the first connection. This allows the component to be unmounted and later remounted (e.g., when used with `SlotToggler`) and still receive the `'connect'` event each time it reappears, ensuring `updateFn` runs every time the component becomes visible.
+5. On every language change, `updateFn` runs again, updating all managed texts.
+6. The library **does not** automatically unsubscribe on unmount (no `addDisposer` is used). Subscriptions persist as long as the `ComponentLocalization` instance lives.
+7. To release resources (e.g., when the component is permanently destroyed and will never be used again), you can manually call `detach()`. In most cases (components that may be remounted), you should **not** call `detach()`.
 
-## Example: Full Component with Dedicated Locales Class
+This design guarantees that your UI always reflects the current language, even for components that are dynamically shown/hidden or moved between slots, without requiring manual re‑attachment.
 
-**`locales/UploadScreenLocales.js`**
+## Updating Dynamic Texts: Direct Updates vs `refresh()`
+
+**❌ Inefficient (calls whole `updateFn`):**
 
 ```javascript
-import { ComponentLocalization } from '@supercat1337/ui-localization';
+onFileAdded() {
+  this.fileCount++;
+  this.l10n.refresh(); // updates ALL texts in the component
+}
+```
+
+**✅ Efficient (updates only what changed):**
+
+```javascript
+onFileAdded() {
+  this.fileCount++;
+  const refs = this.getRefs();
+  refs.counter.innerText = this.l10n.getFilesCountText(this.fileCount);
+}
+```
+
+**When to use `refresh()`:**
+
+- When **many** (10+) dynamic values depend on state and you don't want to write individual assignments.
+- When the component state affects multiple scattered parts of the UI.
+- It is acceptable to call `refresh()` occasionally (e.g., after loading a new dataset), but avoid calling it in high‑frequency updates (like progress indicators).
+
+## Example: Complete Component with Localization
+
+### `locales.js`
+
+```javascript
+// @ts-check
+import { ComponentLocalization } from '@supercat1337/localization';
 
 const dictionary = {
     en: {
@@ -205,7 +241,14 @@ const dictionary = {
     },
 };
 
-export class UploadScreenLocales extends ComponentLocalization {
+/**
+ * @template {import('@supercat1337/ui').Component} TComponent
+ * @extends {ComponentLocalization<typeof dictionary, TComponent>}
+ */
+export class L10n extends ComponentLocalization {
+    /**
+     * @param {{ component: TComponent, update: (l10n: L10n<TComponent>, component: TComponent) => void }} options
+     */
     constructor(options) {
         super(dictionary, options);
     }
@@ -218,40 +261,58 @@ export class UploadScreenLocales extends ComponentLocalization {
 }
 ```
 
-**`UploadScreen.js`**
+### `UploadScreen.js`
 
 ```javascript
+// @ts-check
 import { Component } from '@supercat1337/ui';
-import { UploadScreenLocales } from './locales/UploadScreenLocales.js';
+import { L10n } from './locales.js';
 
 export class UploadScreen extends Component {
     static layout = `<h1 data-ref="title"></h1><span data-ref="counter"></span>`;
+
+    // ✅ DO NOT annotate refsAnnotation
+    refsAnnotation = {
+        title: HTMLHeadingElement.prototype,
+        counter: HTMLSpanElement.prototype,
+    };
 
     constructor() {
         super();
         this.fileCount = 0;
 
-        this.l10n = new UploadScreenLocales({
+        /** @type {L10n<this>} */
+        this.l10n = new L10n({
             component: this,
             update: (l10n, comp) => {
                 const refs = comp.getRefs();
                 refs.title.innerText = l10n.title;
+                // initial value, will be updated later directly
                 refs.counter.innerText = l10n.getFilesCountText(comp.fileCount);
             },
         });
     }
 
-    connectedCallback() {
-        // Ensure UI is up‑to‑date (update runs after attach, but if component was already connected, update already ran; explicit refresh is safe)
-        this.l10n.refresh();
-    }
-
-    incrementFileCount() {
+    // No refresh() in connectedCallback – automatic.
+    onFileAdded() {
         this.fileCount++;
-        this.l10n.refresh(); // re‑run update to refresh counter
+        // Direct update – efficient
+        const refs = this.getRefs();
+        refs.counter.innerText = this.l10n.getFilesCountText(this.fileCount);
     }
 }
 ```
+
+## Typing `refsAnnotation` – Important!
+
+**Do not** add a JSDoc type annotation to `refsAnnotation`. For example, this is **incorrect**:
+
+```javascript
+/** @type {import('@supercat1337/ui').RefsAnnotation} */ // ❌ DON'T DO THIS
+refsAnnotation = { ... };
+```
+
+If you annotate it, TypeScript/JSDoc will widen the type to `Record<string, HTMLElement>` and you will lose the specific keys. By omitting the annotation, the type is inferred as the exact object shape, giving you full auto‑completion and type safety when calling `comp.getRefs()`.
 
 ## Error Handling
 
@@ -265,7 +326,7 @@ export class UploadScreen extends Component {
 You can use `Localization` directly with any custom language provider:
 
 ```javascript
-import { Localization } from '@supercat1337/ui-localization';
+import { Localization } from '@supercat1337/localization';
 
 let currentLang = 'en';
 const listeners = new Set();
@@ -279,7 +340,7 @@ const provider = {
 };
 
 const l10n = new Localization(dictionary, provider);
-l10n.start();
+l10n.startListening();
 
 // later, change language:
 currentLang = 'ru';
@@ -299,35 +360,7 @@ const l10n = new Localization(dictionary, mockProvider);
 expect(l10n.t('title')).toBe('Upload file');
 ```
 
-For `ComponentLocalization`, pass a dummy component stub with `addDisposer`, `isConnected`, `getRefs`.
-
-### Performance: Prefer Direct Updates Over Full Refresh
-
-When only a small part of the UI changes (e.g., a counter, progress bar, or error message), avoid calling `l10n.refresh()`. Instead, update the specific DOM element using the locale method directly.
-
-**❌ Inefficient:**
-
-```javascript
-this.fileCount++;
-this.l10n.refresh(); // updates ALL texts in the component
-```
-
-**✅ Efficient:**
-
-```javascript
-this.fileCount++;
-const refs = this.getRefs();
-refs.counter.innerText = this.l10n.getFilesCountText(this.fileCount);
-```
-
-Call `refresh()` only when:
-
-- The language changes (handled automatically by `ComponentLocalization`)
-- Many texts depend on component state and you want a simple one‑liner (but be aware of performance)
-
-For components with many dynamic texts, consider using a reactive state library (e.g., MobX) that automatically calls specific updaters.
-
----
+For `ComponentLocalization`, pass a dummy component stub with `addDisposer`, `isConnected`, `getRefs`, and `on`.
 
 ## Dependencies
 

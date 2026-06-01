@@ -24,6 +24,13 @@ export interface BareComponent {
     isConnected: boolean;
     /** Returns the map of refs (elements with data-ref) */
     getRefs(): Record<string, HTMLElement>;
+    /**
+     * Subscribes to a component event (e.g., 'connect').
+     * @param event - Event name (e.g., 'connect')
+     * @param callback - Callback function
+     * @returns Unsubscribe function
+     */
+    on(event: string, callback: () => void): () => void;
 }
 
 /**
@@ -48,7 +55,6 @@ export class Localization<TDictionary extends Record<string, any> = any> {
      * @param count - Number to determine plural category.
      * @param forms - Array of 6 strings: [zero, one, two, few, many, other].
      * @param params - Additional named placeholders to replace in the template.
-     * @returns Formatted plural string.
      */
     plural(count: number, forms: string[], params?: Record<string, any>): string;
 
@@ -77,44 +83,47 @@ export class Localization<TDictionary extends Record<string, any> = any> {
      * Starts listening to language changes (idempotent).
      * @returns Unsubscribe function.
      */
-    start(): () => void;
+    startListening(): () => void;
 
     /** Stops listening to language changes. */
-    stop(): void;
+    stopListening(): void;
 }
 
 /**
  * Extended localization class for BareDOM components.
- * Automatically attaches to component lifecycle and updates UI on language change.
+ * Automatically attaches to component lifecycle and updates UI on language change and component mount.
  * @template TDictionary - Same as Localization.
+ * @template TComponent - Type of the BareDOM component (must satisfy BareComponent).
  */
 export class ComponentLocalization<
     TDictionary extends Record<string, any> = any,
+    TComponent extends BareComponent = BareComponent,
 > extends Localization<TDictionary> {
     /**
      * @param dictionary - Translation dictionary.
-     * @param options - Optional configuration.
+     * @param options - Configuration (component and update are required).
      */
     constructor(
         dictionary: TDictionary,
-        options?: {
-            component?: BareComponent;
-            update?: (l10n: this, component: BareComponent) => void;
+        options: {
+            component: TComponent;
+            update: (l10n: this, component: TComponent) => void;
             languageProvider?: LanguageProvider;
         }
     );
 
     /**
      * Attaches the localization instance to a BareDOM component.
+     * Normally called automatically by the constructor; useful for reattaching.
      * @param component - Component instance.
      * @param updateFn - Called on language change or refresh().
      */
-    attach(
-        component: BareComponent,
-        updateFn: (l10n: this, component: BareComponent) => void
-    ): void;
+    attach(component: TComponent, updateFn: (l10n: this, component: TComponent) => void): void;
 
-    /** Manually triggers the update function (e.g., after component state changes). */
+    /**
+     * Manually triggers the update function (e.g., after component state changes).
+     * Prefer direct DOM updates over refresh() for performance when only few values change.
+     */
     refresh(): void;
 
     /** Detaches from component and stops listening to language changes. */

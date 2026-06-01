@@ -31,6 +31,7 @@ export class Localization {
      */
     #getRaw() {
         const lang = this.#languageProvider.getCurrentLanguage();
+        //console.log(lang);
         return this.#dictionary[lang] || this.#dictionary.en || {};
     }
 
@@ -141,13 +142,13 @@ export class Localization {
     /**
      * @returns {() => void}
      */
-    start() {
+    startListening() {
         if (this.#unsubscribe) return this.#unsubscribe;
         this.#unsubscribe = this.onLanguageChange(() => {});
         return this.#unsubscribe;
     }
 
-    stop() {
+    stopListening() {
         if (this.#unsubscribe) {
             this.#unsubscribe();
             this.#unsubscribe = null;
