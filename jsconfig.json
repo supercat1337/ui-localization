@@ -1,0 +1,11 @@
+{
+    "compilerOptions": {
+        "skipLibCheck": true,
+        "target": "ESNext",
+        "module": "NodeNext",
+        "moduleResolution": "NodeNext",
+        "noEmit": true,
+        "lib": ["DOM", "ESNext"]
+    },
+    "exclude": ["node_modules"]
+}

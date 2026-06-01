@@ -1,0 +1,52 @@
+{
+    "name": "@supercat1337/ui-localization",
+    "version": "1.0.0",
+    "description": "Framework-agnostic localization with pluralization, Intl formatting, and optional BareDOM integration",
+    "license": "MIT",
+    "author": "Albert Bazaleev",
+    "type": "module",
+    "main": "./src/index.js",
+    "types": "./src/types.d.ts",
+    "sideEffects": false,
+    "homepage": "https://github.com/supercat1337/ui-localization",
+    "repository": {
+        "url": "git+https://github.com/supercat1337/ui-localization.git"
+    },
+    "files": [
+        "src",
+        "README.md",
+        "package.json"
+    ],
+    "keywords": [
+        "localization",
+        "i18n",
+        "l10n",
+        "pluralization",
+        "intl",
+        "internationalization",
+        "bare-dom",
+        "component",
+        "ui",
+        "translation"
+    ],
+    "exports": {
+        ".": {
+            "import": {
+                "types": "./src/types.d.ts",
+                "default": "./src/index.js"
+            },
+            "browser": {
+                "types": "./src/types.d.ts",
+                "default": "./src/index.js"
+            }
+        }
+    },
+    "peerDependencies": {
+        "@supercat1337/ui": "^2.0.0"
+    },
+    "peerDependenciesMeta": {
+        "@supercat1337/ui": {
+            "optional": true
+        }
+    }
+}
