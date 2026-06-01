@@ -1,6 +1,6 @@
-# `@supercat1337/localization` – Technical Documentation for LLMs
+# `@supercat1337/ui-localization` – Technical Documentation for LLMs
 
-This document provides a complete technical reference for the `@supercat1337/localization` package. Use it to understand the internal API, dictionary format, and integration patterns when generating code for this library.
+This document provides a complete technical reference for the `@supercat1337/ui-localization` package. Use it to understand the internal API, dictionary format, and integration patterns when generating code for this library.
 
 ## Overview
 
@@ -214,7 +214,7 @@ onFileAdded() {
 
 ```javascript
 // @ts-check
-import { ComponentLocalization } from '@supercat1337/localization';
+import { ComponentLocalization } from '@supercat1337/ui-localization';
 
 const dictionary = {
     en: {
@@ -326,7 +326,7 @@ If you annotate it, TypeScript/JSDoc will widen the type to `Record<string, HTML
 You can use `Localization` directly with any custom language provider:
 
 ```javascript
-import { Localization } from '@supercat1337/localization';
+import { Localization } from '@supercat1337/ui-localization';
 
 let currentLang = 'en';
 const listeners = new Set();

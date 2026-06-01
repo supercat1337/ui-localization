@@ -1,4 +1,4 @@
-# @supercat1337/localization
+# @supercat1337/ui-localization
 
 A lightweight, framework-agnostic localization library with support for **pluralization**, **named placeholders**, **number/date formatting**, and **seamless integration with BareDOM components**.
 
@@ -15,7 +15,7 @@ A lightweight, framework-agnostic localization library with support for **plural
 ## Installation
 
 ```bash
-npm install @supercat1337/localization
+npm install @supercat1337/ui-localization
 ```
 
 If you plan to use `ComponentLocalization` with BareDOM, also install the peer dependency:
@@ -31,7 +31,7 @@ npm install @supercat1337/ui
 Tell the library how to obtain the current language and how to listen for language changes.
 
 ```javascript
-import { ComponentLocalization } from '@supercat1337/localization';
+import { ComponentLocalization } from '@supercat1337/ui-localization';
 import { appConfig } from './services/app-config.js';
 
 ComponentLocalization.getCurrentLanguage = () => appConfig.getCurrentLanguage();
@@ -75,7 +75,7 @@ Create a `locales.js` file next to your component:
 
 ```javascript
 // @ts-check
-import { ComponentLocalization } from '@supercat1337/localization';
+import { ComponentLocalization } from '@supercat1337/ui-localization';
 
 const dictionary = {
     /* as above */
@@ -154,7 +154,7 @@ export class UploadScreen extends Component {
 ## Standalone Usage (without BareDOM)
 
 ```javascript
-import { Localization } from '@supercat1337/localization';
+import { Localization } from '@supercat1337/ui-localization';
 
 const provider = {
     getCurrentLanguage: () => 'en',
