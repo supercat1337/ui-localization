@@ -181,6 +181,8 @@ When you attach `ComponentLocalization` to a component:
 
 This design guarantees that your UI always reflects the current language, even for components that are dynamically shown/hidden or moved between slots, without requiring manual re‑attachment.
 
+> **Important:** Even though the localization instance does not automatically unsubscribe when the component unmounts, it is safe. Before calling the `updateFn` on a language change, the library checks `component.isConnected`. If the component is not in the DOM, the update is skipped. Therefore, no errors occur, and you do not need to call `detach()` for components that may be unmounted and later remounted (e.g., when used with `SlotToggler`). Only call `detach()` if the component will be permanently destroyed and never used again.
+
 ## Updating Dynamic Texts: Direct Updates vs `refresh()`
 
 **❌ Inefficient (calls whole `updateFn`):**
